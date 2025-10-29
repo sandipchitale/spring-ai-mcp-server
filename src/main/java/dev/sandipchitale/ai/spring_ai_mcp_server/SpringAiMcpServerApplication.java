@@ -65,19 +65,18 @@ public class SpringAiMcpServerApplication {
                                 seenSessionIds.add(sessionId);
                                 // Create and use the ToolContext for sampling only once.
                                 ToolContext toolContext = new ToolContext(Map.of("exchange", new McpSyncServerExchange(exchange)));
-                                McpToolUtils.getMcpExchange(toolContext).ifPresent(exch -> {
+                                McpToolUtils.getMcpExchange(toolContext).ifPresent(mcpExchange -> {
                                         if (exchange.getClientCapabilities().sampling() != null) {
                                             String ping = "Ping: " + String.valueOf(LocalDateTime.now());
                                             System.out.println("Sending sampling request to LLM: " + ping + " to MCP Client sessionId: " + sessionId);
                                             var messageRequestBuilder = McpSchema.CreateMessageRequest.builder()
-                                                    .messages(List.of(new McpSchema.SamplingMessage(McpSchema.Role.USER,
-                                                            new McpSchema.TextContent(ping))));
-
+                                                    .messages(List.of(new McpSchema.SamplingMessage(McpSchema.Role.USER, new McpSchema.TextContent(ping))));
                                             var opeAiLlmMessageRequest = messageRequestBuilder
                                                     .modelPreferences(McpSchema.ModelPreferences.builder().build())
                                                     .build();
-                                            McpSchema.CreateMessageResult response = exch.createMessage(opeAiLlmMessageRequest);
-                                            System.out.println("Sampling response from LLM: " + ((McpSchema.TextContent) response.content()).text() + " from  MCP Client sessionId: " + sessionId);
+                                            McpSchema.CreateMessageResult response = mcpExchange.createMessage(opeAiLlmMessageRequest);
+                                            System.out.println("Sampling response from LLM: "
+                                                    + ((McpSchema.TextContent) response.content()).text() + " from  MCP Client sessionId: " + sessionId);
                                         }
                                 });
                             }
