@@ -1,7 +1,6 @@
 package dev.sandipchitale.ai.spring_ai_mcp_server;
 
 import io.modelcontextprotocol.server.McpAsyncServerExchange;
-import io.modelcontextprotocol.server.McpNotificationHandler;
 import io.modelcontextprotocol.server.McpRequestHandler;
 import io.modelcontextprotocol.server.McpSyncServerExchange;
 import io.modelcontextprotocol.server.transport.WebMvcStreamableServerTransportProvider;
@@ -18,13 +17,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ReflectionUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Field;
@@ -38,7 +32,7 @@ public class SpringAiMcpServerApplication {
         SpringApplication app = new SpringApplication(SpringAiMcpServerApplication.class);
 
         app.setBanner((environment, sourceClass, out) -> out.println("Spring AI Streamable HTTP MCP Server Application"));
-        ConfigurableApplicationContext context = app.run(args);
+        ConfigurableApplicationContext ignore = app.run(args);
     }
 
     @Bean
@@ -56,7 +50,7 @@ public class SpringAiMcpServerApplication {
                             (Map<String, McpRequestHandler<?>>) requestHandlersField.get(defaultMcpStreamableServerSessionFactory);
                     final McpRequestHandler<?> originalMcpRequestHandler = requestHandlers.get(McpSchema.METHOD_TOOLS_CALL);
                     final Set<String> seenSessionIds = new HashSet<>();
-                    requestHandlers.put(McpSchema.METHOD_TOOLS_CALL, (McpAsyncServerExchange exchange, Object params) -> {
+                    requestHandlers.put(McpSchema.METHOD_TOOLS_LIST, (McpAsyncServerExchange exchange, Object params) -> {
                         // Client supports sampling
                         if (exchange.getClientCapabilities().sampling() != null) {
                             String sessionId = exchange.sessionId();
@@ -66,18 +60,18 @@ public class SpringAiMcpServerApplication {
                                 // Create and use the ToolContext for sampling only once.
                                 ToolContext toolContext = new ToolContext(Map.of("exchange", new McpSyncServerExchange(exchange)));
                                 McpToolUtils.getMcpExchange(toolContext).ifPresent(mcpExchange -> {
-                                        if (exchange.getClientCapabilities().sampling() != null) {
-                                            String ping = "Ping: " + String.valueOf(LocalDateTime.now());
-                                            System.out.println("Sending sampling request to LLM: " + ping + " to MCP Client sessionId: " + sessionId);
-                                            var messageRequestBuilder = McpSchema.CreateMessageRequest.builder()
-                                                    .messages(List.of(new McpSchema.SamplingMessage(McpSchema.Role.USER, new McpSchema.TextContent(ping))));
-                                            var opeAiLlmMessageRequest = messageRequestBuilder
-                                                    .modelPreferences(McpSchema.ModelPreferences.builder().build())
-                                                    .build();
-                                            McpSchema.CreateMessageResult response = mcpExchange.createMessage(opeAiLlmMessageRequest);
-                                            System.out.println("Sampling response from LLM: "
-                                                    + ((McpSchema.TextContent) response.content()).text() + " from  MCP Client sessionId: " + sessionId);
-                                        }
+                                    if (exchange.getClientCapabilities().sampling() != null) {
+                                        String ping = "Ping: " + LocalDateTime.now();
+                                        System.out.println("Sending sampling request to LLM: " + ping + " to MCP Client sessionId: " + sessionId);
+                                        var messageRequestBuilder = McpSchema.CreateMessageRequest.builder()
+                                                .messages(List.of(new McpSchema.SamplingMessage(McpSchema.Role.USER, new McpSchema.TextContent(ping))));
+                                        var opeAiLlmMessageRequest = messageRequestBuilder
+                                                .modelPreferences(McpSchema.ModelPreferences.builder().build())
+                                                .build();
+                                        McpSchema.CreateMessageResult response = mcpExchange.createMessage(opeAiLlmMessageRequest);
+                                        System.out.println("Sampling response from LLM: "
+                                                + ((McpSchema.TextContent) response.content()).text() + " from  MCP Client sessionId: " + sessionId);
+                                    }
                                 });
                             }
                         }
@@ -88,7 +82,8 @@ public class SpringAiMcpServerApplication {
         };
     }
 
-    public record Person(int id, String name){}
+    public record Person(int id, String name) {
+    }
 
     @Service
     public static class PersonService {
@@ -110,9 +105,7 @@ public class SpringAiMcpServerApplication {
         public Optional<Person> getPersonById(int id) {
             return people
                     .stream()
-                    .filter((Person person) -> {
-                        return person.id() == id;
-                    })
+                    .filter((Person person) -> person.id() == id)
                     .findFirst();
         }
     }
